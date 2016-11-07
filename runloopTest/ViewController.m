@@ -9,15 +9,21 @@
 #import "ViewController.h"
 
 @interface ViewController ()
+
 @property (nonatomic, assign) BOOL end;
-@property (nonatomic, strong) UIScrollView *scrollView;
-@property (nonatomic, strong) UILabel *label;
-@property (nonatomic, strong) UIButton *button;
-@property (nonatomic, strong) UILabel *threadLabel;
+
 @end
 
 @implementation ViewController
-
+//说明
+//实现了一个自定义的子线程runloop
+//在子线程中，借助苹果提供的timer方法，构建timer源，加入到runloop中
+//runloop设置了1000s寿命
+//阻塞等待timer信号就绪，执行timer中挂的处理函数
+//观察者观察所有runloop的生命周期事件（kCFRunLoopAllActivities）
+//子线程入口函数中，需要手动创建自动释放池，因为自定义runloop需要用C，已脱离ARC内存管理
+//自定义源，找不到如何构建响应链的方法，如果真正实现100%自定义源，需要对底层有深刻了解，从内核接口开始，自己构建响应链，而苹果底层其实已经帮助我们设计好了响应链，所以我们在使用OC的控件时，不需要关心（从点击了一个button，硬件是怎么将这个信号通过触摸屏传给CPU，又通过哪个CPU接口将这个信号发出，怎么由主线程runloop捕捉到这个信号，又怎么关联上最终我们定义的target和action，何时触发），只要写一个关联一个target-action就好。
+#pragma mark - lifeCycle
 - (void)viewDidLoad
 {
     [super viewDidLoad];
@@ -25,21 +31,11 @@
     [NSThread detachNewThreadSelector:@selector(observerRunLoop) toTarget:self withObject:nil];
     NSLog(@"ok.");
     NSLog(@"main thread = %@", [NSThread currentThread]);
-    [self initUI];
-    self.threadLabel.text = [NSString stringWithFormat:@"%@", [NSThread currentThread]];
-    
 }
 
-- (void)initUI
-{
-    [self scrollView];
-    [self label];
-    [self threadLabel];
-    [self button];
-}
-
+#pragma mark - sub thread entry method
 - (void)observerRunLoop {
-    self.threadLabel.text = [NSString stringWithFormat:@"[NSThread currentThread] = %@", [NSThread currentThread]];
+
     //建立自动释放池
     @autoreleasepool {
     
@@ -66,7 +62,7 @@
         CFRunLoopAddObserver(cfRunLoop, observer, kCFRunLoopDefaultMode);
     }
     
-    //Creates and returns a new NSTimer object and schedules it on the current run loop in the default mode
+    //用子线程timer触发timer类型item
         [NSTimer scheduledTimerWithTimeInterval:10 target:self selector:@selector(doFireTimer:) userInfo:nil repeats:YES];
         
     //自定义源
@@ -147,60 +143,9 @@ void myRunLoopObserver(CFRunLoopObserverRef observer, CFRunLoopActivity activity
     NSLog(@"timer is fire");
 }
 
-- (UIScrollView *)scrollView
-{
-    if(!_scrollView)
-    {
-        _scrollView = [[UIScrollView alloc] initWithFrame:self.view.bounds];
-        [self.view addSubview:_scrollView];
-    }
-    return _scrollView;
-}
-
 static void _perform(void *info __unused)
 {
     printf("hello\n");
 }
 
-- (void)btnClicked:(UIButton *)btn
-{
-    self.label.layer.backgroundColor = [UIColor yellowColor].CGColor;
-}
-
-- (UIButton *)button
-{
-    if(!_button)
-    {
-        _button = [UIButton buttonWithType:UIButtonTypeCustom];
-        _button.backgroundColor = [UIColor blueColor];
-        [_button setTitle:@"自定义源触发" forState:UIControlStateNormal];
-        _button.frame = CGRectMake(30, 690, 100, 40);
-        [self.scrollView addSubview:_button];
-        [_button addTarget:self action:@selector(btnClicked:) forControlEvents:UIControlEventTouchUpInside];
-    }
-    return _button;
-}
-
-- (UILabel *)label
-{
-    if(!_label)
-    {
-        _label  = [[UILabel alloc] initWithFrame:CGRectMake(0, 164, self.view.frame.size.width, 464)];
-        _label.layer.backgroundColor = [UIColor redColor].CGColor;
-        [self.scrollView addSubview:_label];
-    }
-    return _label;
-}
-
-- (UILabel *)threadLabel
-{
-    if(!_threadLabel)
-    {
-        _threadLabel  = [[UILabel alloc] initWithFrame:CGRectMake(0, 64, self.view.frame.size.width, 64)];
-        _threadLabel.numberOfLines = 0;
-        _threadLabel.backgroundColor = [UIColor lightGrayColor];
-        [self.scrollView addSubview:_threadLabel];
-    }
-    return _threadLabel;
-}
 @end
